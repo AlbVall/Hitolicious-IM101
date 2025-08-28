@@ -1,0 +1,106 @@
+.admin-dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+
+.admin-sidebar {
+  width: 250px;
+  background: #232946;
+  color: #fff;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+}
+.admin-sidebar h2 {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.admin-sidebar ul {
+  list-style: none;
+  padding: 0;
+  width: 100%;
+}
+.admin-sidebar li {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.admin-sidebar li.active, .admin-sidebar li:hover {
+  background: #eebbc3;
+  color: #232946;
+}
+
+.admin-main-content {
+  flex: 1;
+  padding: 3rem 2rem;
+  background: #f7f8fa;
+}
+.admin-main-content h1 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: #232946;
+}
+.admin-settings-form {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  max-width: 500px;
+}
+.form-group {
+  margin-bottom: 1.5rem;
+}
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #232946;
+}
+.form-group input[type="text"],
+.form-group input[type="file"] {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #f9fafb;
+}
+.qr-preview {
+  margin-top: 1rem;
+  max-width: 180px;
+  border-radius: 8px;
+  border: 1px solid #eebbc3;
+  box-shadow: 0 2px 8px rgba(238,187,195,0.08);
+}
+.save-btn {
+  background: #232946;
+  color: #fff;
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.save-btn:hover {
+  background: #eebbc3;
+  color: #232946;
+}
+.success-message {
+  margin-top: 1rem;
+  color: #219150;
+  font-weight: 600;
+  background: #e6f9ed;
+  padding: 0.7rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #b6e2c6;
+  text-align: center;
+}
