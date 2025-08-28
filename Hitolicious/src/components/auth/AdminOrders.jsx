@@ -97,7 +97,7 @@ const AdminOrders = () => {
   const archiveOrder = async (orderId) => {
     if (!orderId) return;
 
-    if (!window.confirm('Are you sure you want to archive this order?')) return;
+    if (!window.confirm('Are you sure you want to delete this order?')) return;
 
     try {
       setUpdatingOrder(orderId);
@@ -107,8 +107,8 @@ const AdminOrders = () => {
 
       setOrders((prev) => prev.filter((order) => order.orders_id !== orderId));
     } catch (err) {
-      console.error('Failed to archive order:', err);
-      alert('Archive failed. Try again.');
+      console.error('Failed to delete order:', err);
+      alert('Delete failed. Try again.');
     } finally {
       setUpdatingOrder(null);
     }
@@ -250,7 +250,7 @@ const AdminOrders = () => {
                           disabled={updatingOrder === order.orders_id}
                           className="text-xs text-red-600 hover:text-red-800 font-medium transition-colors duration-200 disabled:opacity-50"
                         >
-                          {updatingOrder === order.orders_id ? 'Archiving...' : 'Archive'}
+                          {updatingOrder === order.orders_id ? 'Deleting...' : 'Delete'}
                         </button>
                       )}
                     </div>
