@@ -6,6 +6,11 @@ const Header = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userName, setUserName] = useState(localStorage.getItem('userFullName') || 'John Doe');
   const [userInitials, setUserInitials] = useState(localStorage.getItem('userInitials') || 'JD');
+  const [profilePicture, setProfilePicture] = useState(() => {
+    const email = localStorage.getItem('userEmail') || '';
+    const namespacedKey = email ? `userProfilePicture:${email}` : 'userProfilePicture';
+    return localStorage.getItem(namespacedKey) || localStorage.getItem('userProfilePicture') || '';
+  });
 
   return (
     <nav className="bg-white shadow-lg">
@@ -21,8 +26,24 @@ const Header = () => {
             <a href="/cart" className="text-gray-700 hover:text-black px-3 py-2 text-base">Cart</a>
             <div className="relative ml-4">
               <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center space-x-2 text-gray-700 hover:text-black focus:outline-none">
-                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-base font-medium">{userInitials}</span>
+                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  {profilePicture ? (
+                    <img
+                      src={profilePicture}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <span 
+                    className={`text-base font-medium ${profilePicture ? 'hidden' : 'flex items-center justify-center'}`}
+                    style={{ display: profilePicture ? 'none' : 'flex' }}
+                  >
+                    {userInitials}
+                  </span>
                 </div>
                 <span className="text-base">{userName}</span>
               </button>

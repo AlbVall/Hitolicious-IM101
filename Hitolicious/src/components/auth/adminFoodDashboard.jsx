@@ -26,6 +26,8 @@ const AdminDashboard = () => {
   const [activeMenu, setActiveMenu] = useState('Food Menu');
   const navigate = useNavigate();
   const [adminData, setAdminData] = useState(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profilePicture, setProfilePicture] = useState('');
   const [foods, setFoods] = useState([]);
   const [archivedFoods, setArchivedFoods] = useState([]);
   const [stocks, setStocks] = useState([]);
@@ -50,10 +52,6 @@ const AdminDashboard = () => {
     price: '',
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminData');
-    navigate('/adminsignin');
-  };
 
   const menuItems = [
     { name: 'Food Menu', icon: (
@@ -71,25 +69,28 @@ const AdminDashboard = () => {
     { name: 'GCash Settings', icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
     ), path: '/adminSettings' },
-    { name: 'Logout', icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-    ), path: '/', action: handleLogout },
   ];
 
   useEffect(() => {
     // Check for admin session
     const storedAdminData = localStorage.getItem('adminData');
     if (!storedAdminData) {
-      navigate('/admin/signin');
+      navigate('/adminSignin');
       return;
     }
     try {
       const parsedAdminData = JSON.parse(storedAdminData);
       console.log('Admin data loaded:', parsedAdminData);
       setAdminData(parsedAdminData);
+      
+      // Get admin-specific profile picture from localStorage
+      const adminEmail = parsedAdminData.admin_email || '';
+      const namespacedKey = adminEmail ? `adminProfilePicture:${adminEmail}` : 'adminProfilePicture';
+      const adminProfilePicture = localStorage.getItem(namespacedKey) || '';
+      setProfilePicture(adminProfilePicture);
     } catch (error) {
       console.error('Error parsing admin data:', error);
-      navigate('/admin/signin');
+      navigate('/adminSignin');
     }
   }, [navigate]);
 
@@ -216,12 +217,20 @@ const AdminDashboard = () => {
   const handleAddFood = async (e) => {
     e.preventDefault();
     try {
+      const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
+      const adminEmail = adminData.admin_email || 'admin@gmail.com';
+      console.log('🔍 Admin data from localStorage:', adminData);
+      console.log('🔍 Admin email being sent:', adminEmail);
+      
       const response = await fetch('http://localhost:5000/api/food', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newFood),
+        body: JSON.stringify({
+          ...newFood,
+          admin_email: adminEmail
+        }),
       });
       if (!response.ok) {
         throw new Error('Failed to add food');
@@ -243,6 +252,12 @@ const AdminDashboard = () => {
       try {
         const response = await fetch(`http://localhost:5000/api/food/${foodId}`, {
           method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            admin_email: JSON.parse(localStorage.getItem('adminData') || '{}').admin_email || 'admin@gmail.com'
+          }),
         });
         if (!response.ok) {
           throw new Error('Failed to delete food');
@@ -264,6 +279,12 @@ const AdminDashboard = () => {
         console.log('Attempting to archive food:', foodId);
         const response = await fetch(`http://localhost:5000/api/food/${foodId}/archive`, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            admin_email: JSON.parse(localStorage.getItem('adminData') || '{}').admin_email || 'admin@gmail.com'
+          }),
         });
 
         const responseText = await response.text();
@@ -302,6 +323,12 @@ const AdminDashboard = () => {
     try {
       const response = await fetch(`http://localhost:5000/api/food/restore/${foodId}`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          admin_email: JSON.parse(localStorage.getItem('adminData') || '{}').admin_email || 'admin@gmail.com'
+        }),
       });
       if (!response.ok) {
         throw new Error('Failed to restore food');
@@ -383,7 +410,10 @@ const AdminDashboard = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ quantity: parseInt(quantity) }),
+        body: JSON.stringify({ 
+          quantity: parseInt(quantity),
+          admin_email: JSON.parse(localStorage.getItem('adminData') || '{}').admin_email || 'admin@gmail.com'
+        }),
       });
 
       const responseText = await response.text();
@@ -419,7 +449,10 @@ const AdminDashboard = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editingFoodData),
+        body: JSON.stringify({
+          ...editingFoodData,
+          admin_email: JSON.parse(localStorage.getItem('adminData') || '{}').admin_email || 'admin@gmail.com'
+        }),
       });
 
       if (!response.ok) {
@@ -440,6 +473,11 @@ const AdminDashboard = () => {
 
   const getStockForFood = (foodId) => {
     return stocks.find(stock => stock.food_id === foodId);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminData');
+    navigate('/adminSignin');
   };
 
   const renderAddFoodModal = () => (
@@ -523,13 +561,6 @@ const AdminDashboard = () => {
               {item.name}
             </button>
           ))}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-4 px-6 py-4 text-lg font-medium text-red-400 rounded-lg transition-colors duration-200 hover:bg-gray-800 mb-2"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
-            Logout
-          </button>
         </nav>
       </div>
 
@@ -540,14 +571,45 @@ const AdminDashboard = () => {
           <div className="px-8 py-4 flex justify-between items-center">
             <h2 className="text-3xl font-bold text-gray-800">{activeMenu}</h2>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center">
-                <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center text-2xl font-semibold">
-                  {adminData?.admin_fullname?.charAt(0) || 'A'}
-                </div>
-                <div className="ml-3">
-                  <p className="text-base font-medium text-gray-700">{adminData?.admin_fullname || 'Admin'}</p>
-                  <p className="text-sm text-gray-500">{adminData?.admin_email || 'admin@example.com'}</p>
-                </div>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                  className="flex items-center space-x-2 text-gray-700 hover:text-black focus:outline-none"
+                >
+                  <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center text-2xl font-semibold overflow-hidden border border-gray-300">
+                    {profilePicture ? (
+                      <img 
+                        src={profilePicture} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextSibling;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span 
+                      className="text-2xl font-semibold"
+                      style={{ display: profilePicture ? 'none' : 'flex' }}
+                    >
+                      {adminData?.admin_fullname?.charAt(0) || 'A'}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-base font-medium text-gray-700">{adminData?.admin_fullname || 'Admin'}</p>
+                    <p className="text-sm text-gray-500">{adminData?.admin_email || 'admin@example.com'}</p>
+                  </div>
+                </button>
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white shadow-lg rounded-md">
+                    <a href="/adminprofile" className="block px-4 py-3 text-gray-700 hover:bg-gray-100">Your Profile</a>
+                    <a href="/adminSignin" className="block px-4 py-3 text-red-600 hover:bg-gray-100" onClick={() => {
+                      localStorage.removeItem('adminData');
+                      window.location.href='/adminSignin';
+                    }}>Sign out</a>
+                  </div>
+                )}
               </div>
             </div>
           </div>

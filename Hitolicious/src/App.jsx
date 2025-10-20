@@ -15,6 +15,8 @@ import AdminOrders from './components/auth/AdminOrders';
 import PaymentCOD from './components/auth/PaymentCOD';
 import OnlinePayment from './components/auth/OnlinePayment';
 import AdminSettings from './components/auth/AdminSettings';
+import AccProfile from './components/auth/AccProfile';
+import AdminProfile from './components/auth/AdminProfile';
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
         <Route path="/online-payment" element={<OnlinePayment />} />
         <Route path="/" element={<Signin />} />
         <Route path="/home" element={<HomePage />} />
+        <Route path="/profile" element={<AccProfile />} />
+        <Route path="/adminProfile" element={<AdminProfile />} />
       </Routes>
     </Router>
   )

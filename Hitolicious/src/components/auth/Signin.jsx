@@ -70,12 +70,24 @@ const Signin = () => {
 
         if (res.data.success) {
           showSuccess('Welcome back! You have successfully signed in.', 'Login Successful');
-          const fullName = res.data.user.customer_fullname || 'John Doe';
+          const user = res.data.user;
+          console.log('User data from backend:', user);
+          
+          const fullName = user.customer_fullname || 'John Doe';
           localStorage.setItem('userFullName', fullName);
           const initials = fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
           localStorage.setItem('userInitials', initials);
           localStorage.setItem('userEmail', formData.email);
           localStorage.setItem('userName', formData.email.split('@')[0]);
+          localStorage.setItem('userBirthday', user.Customer_birthday || '');
+          localStorage.setItem('userPhone', user.Customer_phone || '');
+          localStorage.setItem('userAddress', user.Customer_Address || '');
+          
+          console.log('Stored in localStorage:', {
+            userBirthday: user.Customer_birthday,
+            userPhone: user.Customer_phone,
+            userAddress: user.Customer_Address
+          });
           
           // Navigate after a short delay to show the success message
           setTimeout(() => {

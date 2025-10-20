@@ -6,14 +6,43 @@ const Header = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userName, setUserName] = useState('John Doe');
   const [userInitials, setUserInitials] = useState('JD');
+  const [profilePicture, setProfilePicture] = useState('');
 
   useEffect(() => {
-    const storedFullName = localStorage.getItem('userFullName');
-    const storedInitials = localStorage.getItem('userInitials');
-    if (storedFullName && storedInitials) {
-      setUserName(storedFullName);
-      setUserInitials(storedInitials);
-    }
+    const updateProfileData = () => {
+      const storedFullName = localStorage.getItem('userFullName');
+      const storedInitials = localStorage.getItem('userInitials');
+      const email = localStorage.getItem('userEmail') || '';
+      const namespacedKey = email ? `userProfilePicture:${email}` : 'userProfilePicture';
+      const storedProfilePicture = localStorage.getItem(namespacedKey) || '';
+      if (storedFullName && storedInitials) {
+        setUserName(storedFullName);
+        setUserInitials(storedInitials);
+      }
+      setProfilePicture(storedProfilePicture);
+    };
+
+    // Initial load
+    updateProfileData();
+
+    // Listen for localStorage changes
+    const handleStorageChange = (e) => {
+      const email = localStorage.getItem('userEmail') || '';
+      const namespacedKey = email ? `userProfilePicture:${email}` : 'userProfilePicture';
+      if (e.key === namespacedKey || e.key === 'userProfilePicture' || e.key === 'userFullName' || e.key === 'userInitials') {
+        updateProfileData();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events (for same-tab updates)
+    window.addEventListener('profileUpdated', updateProfileData);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profileUpdated', updateProfileData);
+    };
   }, []);
 
   return (
@@ -30,16 +59,40 @@ const Header = () => {
             <a href="/cart" className="text-black border-b-2 border-black px-3 py-2 text-base">Cart</a>
             <div className="relative ml-4">
               <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center space-x-2 text-gray-700 hover:text-black focus:outline-none">
-                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-base font-medium">{userInitials}</span>
+                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  {profilePicture ? (
+                    <img
+                      src={profilePicture}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <span 
+                    className={`text-base font-medium ${profilePicture ? 'hidden' : 'flex items-center justify-center'}`}
+                    style={{ display: profilePicture ? 'none' : 'flex' }}
+                  >
+                    {userInitials}
+                  </span>
                 </div>
                 <span className="text-base">{userName}</span>
               </button>
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white shadow-lg rounded-md">
                   <a href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-100">Your Profile</a>
-                  <a href="/account" className="block px-4 py-3 text-gray-700 hover:bg-gray-100">Account Settings</a>
-                  <a href="/" className="block px-4 py-3 text-red-600 hover:bg-gray-100" onClick={() => {localStorage.removeItem('userEmail');localStorage.removeItem('userName');window.location.href='/';}}>Sign out</a>
+                  <a href="/" className="block px-4 py-3 text-red-600 hover:bg-gray-100" onClick={() => {
+                    localStorage.removeItem('userEmail');
+                    localStorage.removeItem('userName');
+                    localStorage.removeItem('userFullName');
+                    localStorage.removeItem('userInitials');
+                    localStorage.removeItem('userPhone');
+                    localStorage.removeItem('userAddress');
+                    localStorage.removeItem('userBirthday');
+                    window.location.href='/';
+                  }}>Sign out</a>
                 </div>
               )}
             </div>

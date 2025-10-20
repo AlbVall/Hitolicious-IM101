@@ -11,10 +11,14 @@ const AdminOrders = () => {
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [adminData, setAdminData] = useState(null);
   const navigate = useNavigate();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profilePicture, setProfilePicture] = useState('');
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminData');
-    navigate('/adminsignin');
+  // Normalize DB-specific statuses to UI statuses
+  const normalizeStatus = (status) => {
+    if (!status) return status;
+    const lower = String(status).toLowerCase();
+    return lower === 'out_delivery' ? 'out_for_delivery' : lower;
   };
 
   const menuItems = [
@@ -33,25 +37,28 @@ const AdminOrders = () => {
     { name: 'GCash Settings', icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
     ), path: '/adminSettings' },
-    { name: 'Logout', icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-    ), path: '/', action: handleLogout },
   ];
 
   useEffect(() => {
     // Check for admin session
     const storedAdminData = localStorage.getItem('adminData');
     if (!storedAdminData) {
-      navigate('/admin/signin');
+      navigate('/adminSignin');
       return;
     }
     try {
       const parsedAdminData = JSON.parse(storedAdminData);
       console.log('Admin data loaded:', parsedAdminData);
       setAdminData(parsedAdminData);
+      
+      // Get admin-specific profile picture from localStorage
+      const adminEmail = parsedAdminData.admin_email || '';
+      const namespacedKey = adminEmail ? `adminProfilePicture:${adminEmail}` : 'adminProfilePicture';
+      const adminProfilePicture = localStorage.getItem(namespacedKey) || '';
+      setProfilePicture(adminProfilePicture);
     } catch (error) {
       console.error('Error parsing admin data:', error);
-      navigate('/admin/signin');
+      navigate('/adminSignin');
     }
     fetchOrders();
   }, [navigate]);
@@ -75,20 +82,55 @@ const AdminOrders = () => {
       return;
     }
 
+    if (!adminData?.admin_email) {
+      alert('Admin information missing. Cannot update status.');
+      return;
+    }
+
+    const sendUpdate = async (statusValue) => {
+      const apiStatus = statusValue === 'out_for_delivery' ? 'out for delivery' : statusValue;
+      console.log('🔍 Admin data being used:', adminData);
+      console.log('🔍 Admin email being sent:', adminData.admin_email);
+      
+      return axios.put(`http://localhost:5000/api/orders/${orderId}/status`, {
+        status: apiStatus,
+        admin_email: adminData.admin_email,
+        updated_by: adminData.admin_email,
+      });
+    };
+
     try {
       setUpdatingOrder(orderId);
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, {
-        status: newStatus,
-      });
+      await sendUpdate(newStatus);
 
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.orders_id === orderId ? { ...order, order_status: newStatus } : order
-        )
-      );
+      // Refresh orders to get updated_by information
+      await fetchOrders();
     } catch (err) {
+      // If backend returns 422 with allowed_statuses, try to map and retry once
+      const data = err?.response?.data;
+      const statusCode = err?.response?.status;
+      if (statusCode === 422 && Array.isArray(data?.allowed_statuses) && data.allowed_statuses.length > 0) {
+        const normalizeToken = (s) => String(s || '').toLowerCase().replace(/\s+/g, '_');
+        const desiredToken = normalizeToken(newStatus === 'out_for_delivery' ? 'out for delivery' : newStatus);
+        const match = data.allowed_statuses.find((v) => normalizeToken(v) === desiredToken) 
+          || data.allowed_statuses.find((v) => normalizeToken(v).includes('delivery'));
+        if (match) {
+          try {
+            await sendUpdate(match);
+            await fetchOrders();
+            setUpdatingOrder(null);
+            return;
+          } catch (retryErr) {
+            console.error('Retry failed:', retryErr);
+          }
+        }
+      }
+
       console.error('Failed to update order status:', err);
-      alert('Failed to update order status.');
+      const msg = data
+        ? `Error: ${data.error || err.message}\nResolved: ${data.resolved_status || ''}\nAllowed: ${JSON.stringify(data.allowed_statuses || [])}`
+        : (err?.message || 'Failed to update order status.');
+      alert(msg);
     } finally {
       setUpdatingOrder(null);
     }
@@ -99,10 +141,16 @@ const AdminOrders = () => {
 
     if (!window.confirm('Are you sure you want to delete this order?')) return;
 
+    if (!adminData?.admin_email) {
+      alert('Admin information missing. Cannot archive order.');
+      return;
+    }
+
     try {
       setUpdatingOrder(orderId);
       await axios.post(`http://localhost:5000/api/orders/${orderId}/archive`, {
-        archivedBy: adminData?.admin_fullname || adminData?.admin_email || 'admin',
+        archivedBy: adminData.admin_email,
+        admin_email: adminData.admin_email,
       });
 
       setOrders((prev) => prev.filter((order) => order.orders_id !== orderId));
@@ -123,6 +171,8 @@ const AdminOrders = () => {
       case 'preparing':
         return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'out_for_delivery':
+      case 'out for delivery':
+      case 'out_delivery':
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'delivered':
         return 'bg-green-100 text-green-800 border-green-200';
@@ -148,16 +198,21 @@ const AdminOrders = () => {
     if (selectedStatus === 'all') return orders;
     return orders.filter(
       (order) =>
-        order.order_status?.toLowerCase() === selectedStatus.toLowerCase()
+        normalizeStatus(order.order_status) === selectedStatus.toLowerCase()
     );
   };
 
   const getPendingOrders = () => {
-    return orders.filter(order => order.order_status?.toLowerCase() === 'pending');
+    return orders.filter(order => normalizeStatus(order.order_status) === 'pending');
   };
 
   const getOtherOrders = () => {
-    return orders.filter(order => order.order_status?.toLowerCase() !== 'pending');
+    return orders.filter(order => normalizeStatus(order.order_status) !== 'pending');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminData');
+    navigate('/adminSignin');
   };
 
   const statusOptions = [
@@ -185,13 +240,14 @@ const AdminOrders = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated By</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {orders.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                   {emptyMessage}
                 </td>
               </tr>
@@ -222,35 +278,45 @@ const AdminOrders = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(order.order_status)}`}>
-                      {order.order_status?.replace(/_/g, ' ').toUpperCase()}
+                      {order.order_status === 'out_delivery' ? 'OUT FOR DELIVERY' : order.order_status?.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(order.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {order.order_status !== 'delivered' && order.order_status !== 'cancelled' && (
-                        <select
-                          value={order.order_status}
-                          onChange={(e) => updateOrderStatus(order.orders_id, e.target.value)}
-                          disabled={updatingOrder === order.orders_id}
-                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black"
-                        >
-                          {statusOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="text-sm text-gray-600">
+                      {order.updated_by ? (
+                        <span className="font-medium">{order.updated_by}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">Not updated</span>
                       )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={normalizeStatus(order.order_status)}
+                        onChange={(e) => updateOrderStatus(order.orders_id, e.target.value)}
+                        disabled={updatingOrder === order.orders_id}
+                        className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black"
+                        title="Change order status"
+                      >
+                        {statusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {/* Placeholder for modern actions menu (archive/delete) - will be implemented next */}
                       {(order.order_status === 'delivered' || order.order_status === 'cancelled') && (
                         <button
                           onClick={() => archiveOrder(order.orders_id)}
                           disabled={updatingOrder === order.orders_id}
                           className="text-xs text-red-600 hover:text-red-800 font-medium transition-colors duration-200 disabled:opacity-50"
+                          title="Delete Order"
                         >
-                          {updatingOrder === order.orders_id ? 'Deleting...' : 'Delete'}
+                          {updatingOrder === order.orders_id ? 'Archiving...' : 'Delete'}
                         </button>
                       )}
                     </div>
@@ -301,13 +367,7 @@ const AdminOrders = () => {
               {item.name}
             </button>
           ))}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-4 px-6 py-4 text-lg font-medium text-red-400 rounded-lg transition-colors duration-200 hover:bg-gray-800 mb-2"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
-            Logout
-          </button>
+          
         </nav>
       </div>
 
@@ -318,14 +378,45 @@ const AdminOrders = () => {
           <div className="px-8 py-4 flex justify-between items-center">
             <h2 className="text-3xl font-bold text-gray-800">Order Management</h2>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center">
-                <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center text-2xl font-semibold">
-                  {adminData?.admin_fullname?.charAt(0) || 'A'}
-                </div>
-                <div className="ml-3">
-                  <p className="text-base font-medium text-gray-700">{adminData?.admin_fullname || 'Admin'}</p>
-                  <p className="text-sm text-gray-500">{adminData?.admin_email || 'admin@example.com'}</p>
-                </div>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                  className="flex items-center space-x-2 text-gray-700 hover:text-black focus:outline-none"
+                >
+                  <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center text-2xl font-semibold overflow-hidden border border-gray-300">
+                    {profilePicture ? (
+                      <img 
+                        src={profilePicture} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextSibling;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span 
+                      className="text-2xl font-semibold"
+                      style={{ display: profilePicture ? 'none' : 'flex' }}
+                    >
+                      {adminData?.admin_fullname?.charAt(0) || 'A'}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-base font-medium text-gray-700">{adminData?.admin_fullname || 'Admin'}</p>
+                    <p className="text-sm text-gray-500">{adminData?.admin_email || 'admin@example.com'}</p>
+                  </div>
+                </button>
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white shadow-lg rounded-md">
+                    <a href="/adminprofile" className="block px-4 py-3 text-gray-700 hover:bg-gray-100">Your Profile</a>
+                    <a href="/adminSignin" className="block px-4 py-3 text-red-600 hover:bg-gray-100" onClick={() => {
+                      localStorage.removeItem('adminData');
+                      window.location.href='/adminSignin';
+                    }}>Sign out</a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -377,7 +468,7 @@ const AdminOrders = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Delivered</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {orders.filter(o => o.order_status === 'delivered').length}
+                    {orders.filter(o => normalizeStatus(o.order_status) === 'delivered').length}
                   </p>
                 </div>
               </div>
@@ -392,7 +483,7 @@ const AdminOrders = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Cancelled</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {orders.filter(o => o.order_status === 'cancelled').length}
+                    {orders.filter(o => normalizeStatus(o.order_status) === 'cancelled').length}
                   </p>
                 </div>
               </div>

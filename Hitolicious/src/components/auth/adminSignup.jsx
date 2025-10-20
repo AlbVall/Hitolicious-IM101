@@ -11,17 +11,29 @@ const Signup = () => {
     work: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    admin_phonenumber: '',
+    admin_address: ''
   });
 
   const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // For phone number, only allow numeric input
+    if (name === 'admin_phonenumber') {
+      const numericValue = value.replace(/\D/g, ''); // Remove non-numeric characters
+      setFormData(prev => ({
+        ...prev,
+        [name]: numericValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const validateForm = () => {
@@ -30,6 +42,14 @@ const Signup = () => {
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!formData.birthday) newErrors.birthday = 'Birthday is required';
     if (!formData.work.trim()) newErrors.work = 'Work position is required';
+    if (!formData.admin_phonenumber.trim()) {
+      newErrors.admin_phonenumber = 'Phone number is required';
+    } else if (formData.admin_phonenumber.length !== 11) {
+      newErrors.admin_phonenumber = 'Phone number must be exactly 11 digits';
+    } else if (!/^\d{11}$/.test(formData.admin_phonenumber)) {
+      newErrors.admin_phonenumber = 'Phone number must contain only numbers';
+    }
+    if (!formData.admin_address.trim()) newErrors.admin_address = 'Address is required';
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
@@ -150,6 +170,49 @@ const Signup = () => {
                 />
                 {errors.work && (
                   <p className="mt-2 text-[18px] text-red-600">{errors.work}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="admin_phonenumber" className="block text-[18px] font-medium text-gray-700">
+                Phone Number
+              </label>
+              <div className="mt-1">
+                <input
+                  id="admin_phonenumber"
+                  name="admin_phonenumber"
+                  type="tel"
+                  required
+                  maxLength={11}
+                  value={formData.admin_phonenumber}
+                  onChange={handleChange}
+                  className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all duration-200"
+                  placeholder="Enter your phone number (11 digits)"
+                />
+                {errors.admin_phonenumber && (
+                  <p className="mt-2 text-[18px] text-red-600">{errors.admin_phonenumber}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="admin_address" className="block text-[18px] font-medium text-gray-700">
+                Address
+              </label>
+              <div className="mt-1">
+                <textarea
+                  id="admin_address"
+                  name="admin_address"
+                  required
+                  rows={3}
+                  value={formData.admin_address}
+                  onChange={handleChange}
+                  className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all duration-200 resize-none"
+                  placeholder="Enter your address"
+                />
+                {errors.admin_address && (
+                  <p className="mt-2 text-[18px] text-red-600">{errors.admin_address}</p>
                 )}
               </div>
             </div>

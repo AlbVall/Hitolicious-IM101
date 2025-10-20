@@ -8,6 +8,8 @@ const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: '',
     birthday: '',
+    phone: '',
+    address: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -17,9 +19,11 @@ const Signup = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // Enforce digits-only for phone while typing
+    const nextValue = name === 'phone' ? value.replace(/\D/g, '') : value;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -28,6 +32,9 @@ const Signup = () => {
 
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!formData.birthday) newErrors.birthday = 'Birthday is required';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone is required';
+    else if (!/^\d{11}$/.test(formData.phone)) newErrors.phone = 'Phone must be exactly 11 digits';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
@@ -58,6 +65,17 @@ const Signup = () => {
         const res = await axios.post('http://localhost:5000/api/customer/signup', sendData);
 
         if (res.data.success) {
+          // Store user data in localStorage after successful signup
+          localStorage.setItem('userFullName', formData.fullName);
+          localStorage.setItem('userEmail', formData.email);
+          localStorage.setItem('userBirthday', formData.birthday);
+          localStorage.setItem('userPhone', formData.phone);
+          localStorage.setItem('userAddress', formData.address);
+          
+          const initials = formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+          localStorage.setItem('userInitials', initials);
+          localStorage.setItem('userName', formData.email.split('@')[0]);
+          
           alert('Account created successfully!');
           navigate('/signin');
         } else {
@@ -122,6 +140,41 @@ const Signup = () => {
               />
               {errors.birthday && <p className="text-red-600">{errors.birthday}</p>}
             </div>
+
+          <div>
+            <label htmlFor="phone" className="block text-[18px] font-medium text-gray-700">
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              maxLength={11}
+              value={formData.phone}
+              onChange={handleChange}
+              className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-black"
+              placeholder="Enter your phone number"
+            />
+            {errors.phone && <p className="text-red-600">{errors.phone}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="address" className="block text-[18px] font-medium text-gray-700">
+              Address
+            </label>
+            <textarea
+              id="address"
+              name="address"
+              rows={3}
+              required
+              value={formData.address}
+              onChange={handleChange}
+              className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-black"
+              placeholder="Enter your full address"
+            />
+            {errors.address && <p className="text-red-600">{errors.address}</p>}
+          </div>
 
             <div>
               <label htmlFor="email" className="block text-[18px] font-medium text-gray-700">
